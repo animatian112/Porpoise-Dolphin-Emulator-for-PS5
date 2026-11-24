@@ -61,6 +61,12 @@ jobs:
           sdk_rev=$(sed -n 's/^sdk_revision=//p' Porpoise/tools/setup-native-dependencies.sh)
           git -C PS5_PayloadSDK fetch --quiet origin "$sdk_rev"
           git -C PS5_PayloadSDK cat-file -e "$sdk_rev^{commit}"
+          # The package's licence notices quote LLVM's licence (libc++ and the
+          # runtime linked into eboot.bin); stage-notices.py also looks in
+          # ../PS5_LLVM, so only that file is fetched, not all of LLVM.
+          mkdir -p PS5_LLVM/llvm
+          curl -fsSL -o PS5_LLVM/llvm/LICENSE.TXT \
+            https://raw.githubusercontent.com/llvm/llvm-project/main/llvm/LICENSE.TXT
 
       - name: Restore built dependencies
         uses: actions/cache@v4
