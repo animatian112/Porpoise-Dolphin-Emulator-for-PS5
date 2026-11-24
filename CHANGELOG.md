@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+**New**
+- **A Wii game's own SD card** (a game's settings → This Game → SD Card):
+  choose an SD card image of your own, such as a mod pack's `sd.raw`, from
+  `/data/porpoise/sd` or a USB drive. The game sees it in the Wii's SD slot;
+  other games keep the usual card.
+
 ## 4.0 — 2026-10-21
 
 **New**

@@ -1461,6 +1461,10 @@ private:
     void tile_art_refresh();
     float stick_x_ = 0, stick_y_ = 0; /* the left stick as it is */
     bool browse_images_ = false;      /* the folder browser lists pictures, for the tile art */
+    bool browse_sd_ = false;          /* the folder browser lists SD card images, for a Wii game's SD Card */
+    std::string sd_dir() const;       /* Porpoise's folder for them: <data>/sd */
+    void set_game_sd(const std::string &path); /* the game's own SD card ("" the usual one), saved at once */
+    void close_sd_browser();
     void make_forwarder();
     int audio_preset_ = 0; /* Settings > Audio's Sound preset row (Settings::audio_preset) */
     int music_level_ = 0, sounds_level_ = 0; /* Settings > Interface's Menu Music and Menu Sounds rows */
@@ -1539,6 +1543,7 @@ private:
             Game,
             Place,
             Picture, /* browse_images_: a .png or .jpg */
+            SdImage, /* browse_sd_: an SD card image (.raw, .img) */
         } kind = Folder;
         std::string label, path;
         long long size = 0; /* a game's, in bytes */

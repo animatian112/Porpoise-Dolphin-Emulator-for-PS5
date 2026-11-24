@@ -195,7 +195,7 @@ bool is_dolphin_key(const std::string &key)
 
 bool is_text_key(const std::string &key)
 {
-    return key == "border" || key == "online_dns" || is_dolphin_key(key);
+    return key == "border" || key == "online_dns" || key == "wii_sd" || is_dolphin_key(key);
 }
 
 const Field *field(const std::string &key)
@@ -304,6 +304,12 @@ bool Settings::load(const std::string &path, bool overlay)
         {
             if (!overlay)
                 online_dns = v; /* the console's setting: never a game's own */
+            continue;
+        }
+        if (k == "wii_sd")
+        {
+            if (overlay)
+                wii_sd = v; /* a game's own: never global */
             continue;
         }
         if (is_dolphin_key(k))
@@ -532,6 +538,8 @@ bool Settings::save_keys(const std::string &path, const std::vector<std::string>
             std::fprintf(f, "border = %s\n", border.c_str());
         else if (k == "online_dns")
             std::fprintf(f, "online_dns = %s\n", online_dns.c_str());
+        else if (k == "wii_sd" && !wii_sd.empty())
+            std::fprintf(f, "wii_sd = %s\n", wii_sd.c_str());
         else if (is_dolphin_key(k) && !get(k).empty())
             std::fprintf(f, "%s = %s\n", k.c_str(), get(k).c_str());
     }
@@ -739,6 +747,11 @@ bool Settings::set(const std::string &key, const std::string &value)
         online_dns = value;
         return true;
     }
+    if (key == "wii_sd")
+    {
+        wii_sd = value;
+        return true;
+    }
     if (is_dolphin_key(key))
     {
         for (auto &kv : dolphin)
@@ -770,6 +783,8 @@ std::vector<std::string> Settings::changed_keys(const Settings &before) const
         keys.push_back("border");
     if (online_dns != before.online_dns)
         keys.push_back("online_dns");
+    if (wii_sd != before.wii_sd)
+        keys.push_back("wii_sd");
     if (stay_sandboxed != before.stay_sandboxed)
         keys.push_back("stay_sandboxed");
     auto add_dolphin = [&](const std::vector<std::pair<std::string, std::string>> &from) {
@@ -808,6 +823,8 @@ std::string Settings::get(const std::string &key) const
         return border;
     if (key == "online_dns")
         return online_dns;
+    if (key == "wii_sd")
+        return wii_sd;
     if (is_dolphin_key(key))
     {
         for (const auto &kv : dolphin)

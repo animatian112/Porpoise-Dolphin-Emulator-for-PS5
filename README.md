@@ -528,6 +528,16 @@ for a custom server) go here too. **Settings → System → WiiConnect24
 Channels** is only for the WiiConnect24 channels; it doesn't look for or need
 any code.
 
+### A Wii game's own SD card
+
+Some Wii mods and homebrew read their files from the Wii's SD card (a mod
+pack's `sd.raw`, for example). Put the image in **`/data/porpoise/sd/`** or on
+a USB drive, then in the game's settings choose **This Game → SD Card** and
+pick it (`.raw` and `.img` files are listed). The game sees that card in the
+Wii's SD slot and can write to it as to a real card, so keep a copy of the
+original. **Square** in the picker puts the game back on Porpoise's usual card.
+A game with no card of its own, and every GameCube game, keeps the usual one.
+
 ## Controls
 
 ### Launcher
@@ -597,6 +607,7 @@ becomes the next player, up to four, and can join in the middle of a game.
 | `/data/porpoise/bios/` | Your own GameCube BIOS, under any name (optional) |
 | `/data/porpoise/screenshots/` | Your screenshots, a folder for each game |
 | `/data/porpoise/cheats/` | Your own cheat codes, one `<game ID>.ini` per game (optional) |
+| `/data/porpoise/sd/` | Your own Wii SD card images (`sd.raw`), chosen per game (optional) |
 | `/data/porpoise/retroachievements.ini` | Your RetroAchievements sign-in token (not your password) |
 | `/data/porpoise/achievements/` | Each game's achievement list as of your last play, and the badges |
 | `/data/porpoise/location.txt` | Where Porpoise's folder is, after you moved it to another drive |

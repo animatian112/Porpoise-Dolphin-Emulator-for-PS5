@@ -3978,7 +3978,7 @@ index c53281053f..e2260dc848 100644
    if (Libretro::GBPlayer_active)
    {
      Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], Libretro::GBPlayer_rom_path);
-@@ -294,7 +309,31 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -294,7 +309,64 @@ bool retro_load_game(const struct retro_game_info* game)
    {
      Config::SetBase(Config::MAIN_GBA_ROM_PATHS[Config::GBPLAYER_GBA_INDEX], std::string{});
    }
@@ -4007,10 +4007,43 @@ index c53281053f..e2260dc848 100644
 +    }
 +  }
 +#endif
++  /* Porpoise: the Wii's SD card for this game. The frontend names an SD card
++   * image of the player's own (a mod pack's sd.raw, say) in
++   * PORPOISE_WII_SD_IMAGE; without one, the usual card. Dolphin's SD slot
++   * (IOS/SDIO/SDIOSlot0) opens File::GetUserPath(F_WIISDCARDIMAGE_IDX), which
++   * is process-wide, and the core stays loaded from one game to the next: the
++   * usual path is kept from the first start and put back for every game that
++   * has no card of its own. */
++  {
++    static std::string porpoise_usual_sd;
++    if (porpoise_usual_sd.empty())
++      porpoise_usual_sd = File::GetUserPath(F_WIISDCARDIMAGE_IDX);
++    const char* own_sd = std::getenv("PORPOISE_WII_SD_IMAGE");
++    const std::string own_sd_path =
++        own_sd && *own_sd ? Libretro::VFile::NormalizePath(own_sd) : std::string{};
++    if (!own_sd_path.empty() && File::IsFile(own_sd_path))
++    {
++      File::SetUserPath(F_WIISDCARDIMAGE_IDX, own_sd_path);
++      // The card is in for this run (not saved in Dolphin.ini), and the SD
++      // folder sync is off: it would write the sync folder over the image
++      // when the game starts, and the image back over the folder after.
++      Config::SetCurrent(Config::MAIN_WII_SD_CARD, true);
++      Config::SetCurrent(Config::MAIN_WII_SD_CARD_ENABLE_FOLDER_SYNC, false);
++      NOTICE_LOG_FMT(BOOT, "Porpoise: this game's own SD card: {}", own_sd_path);
++    }
++    else
++    {
++      if (!own_sd_path.empty())
++        WARN_LOG_FMT(BOOT, "Porpoise: the game's SD card {} isn't there; the usual card instead",
++                     own_sd_path);
++      if (!porpoise_usual_sd.empty())
++        File::SetUserPath(F_WIISDCARDIMAGE_IDX, porpoise_usual_sd);
++    }
++  }
    Discord::SetDiscordPresenceEnabled(false);
    Common::SetEnableAlert(false);
    Common::SetAbortOnPanicAlert(false);
-@@ -303,6 +342,18 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -303,6 +375,18 @@ bool retro_load_game(const struct retro_game_info* game)
    {
      // Log the message instead of showing a popup
      WARN_LOG_FMT(COMMON, "Suppressed popup: {} - {}", caption, text);
@@ -4029,7 +4062,7 @@ index c53281053f..e2260dc848 100644
      Libretro::Log::LogFrontEnd(style, caption, text, 2000);
      return true; // Always "continue"
    });
-@@ -357,6 +408,30 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -357,6 +441,30 @@ bool retro_load_game(const struct retro_game_info* game)
  #endif
    Config::SetBase(Config::MAIN_ACCURATE_CPU_CACHE,
      Libretro::GetOption<bool>(core::MAIN_ACCURATE_CPU_CACHE, /*def=*/false));
@@ -4060,7 +4093,7 @@ index c53281053f..e2260dc848 100644
  
    Config::SetBase(Config::MAIN_DSP_HLE,
                       Libretro::GetOption<bool>(audio::DSP_HLE, /*def=*/true));
-@@ -496,6 +571,17 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -496,6 +604,17 @@ bool retro_load_game(const struct retro_game_info* game)
  
    Config::SetBase(Config::GFX_WAIT_FOR_SHADERS_BEFORE_STARTING,
      Libretro::GetOption<bool>(gfx_settings::WAIT_FOR_SHADERS, /*def=*/false));
@@ -4078,7 +4111,7 @@ index c53281053f..e2260dc848 100644
  
    if (Common::is_uwp())
      Config::SetBase(Config::GFX_SHADER_CACHE, false);
-@@ -646,6 +732,10 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -646,6 +765,10 @@ bool retro_load_game(const struct retro_game_info* game)
    NOTICE_LOG_FMT(BOOT, "CPU Core: {}", Libretro::Options::CPUCoreToString(Config::Get(Config::MAIN_CPU_CORE)));
    NOTICE_LOG_FMT(BOOT, "Fastmem enabled = {}", (Config::Get(Config::MAIN_FASTMEM)) ? "Yes" : "No");
    NOTICE_LOG_FMT(BOOT, "JIT debug enabled = {}", Config::IsDebuggingEnabled() ? "Yes" : "No");
@@ -4089,7 +4122,7 @@ index c53281053f..e2260dc848 100644
  
    Libretro::FrameTiming::Init();
    Libretro::Audio::Init();
-@@ -687,6 +777,29 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -687,6 +810,29 @@ bool retro_load_game(const struct retro_game_info* game)
      }
    }
  
@@ -4119,7 +4152,7 @@ index c53281053f..e2260dc848 100644
    for (auto& normalized_game_path : normalized_game_paths)
      Libretro::disk_paths.push_back(Libretro::VFile::DenormalizePath(normalized_game_path));
  
-@@ -708,16 +821,158 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -708,16 +854,158 @@ bool retro_load_game(const struct retro_game_info* game)
    const bool disc_based_games_boot_to_wii_menu = Libretro::GetOption<bool>(Libretro::Options::core::DISC_BASED_GAMES_BOOT_TO_WII_MENU, false);
    std::unique_ptr<BootParameters> boot_params = BootParameters::GenerateFromFile(normalized_game_paths);
  
@@ -4282,7 +4315,7 @@ index c53281053f..e2260dc848 100644
      }
  
      const std::string wii_menu_tmd_file_name = Common::GetTMDFileName(Titles::SYSTEM_MENU, Common::FromWhichRoot::Configured);
-@@ -727,17 +982,45 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -727,17 +1015,45 @@ bool retro_load_game(const struct retro_game_info* game)
  
      if (is_disc_title && wii_menu_installed)
      {
@@ -4330,7 +4363,7 @@ index c53281053f..e2260dc848 100644
    Libretro::Input::InitStage2();
  
    const bool importCheats = Libretro::GetOption<bool>(retroarch_core::CHEATS_IMPORT, true);
-@@ -804,6 +1087,7 @@ void retro_unload_game(void)
+@@ -804,6 +1120,7 @@ void retro_unload_game(void)
  
      Core::Shutdown(system);
    }
@@ -4338,7 +4371,7 @@ index c53281053f..e2260dc848 100644
  
    if (!g_context_status.IsDestroyed() && g_video_backend)
      g_video_backend->Shutdown();
-@@ -841,6 +1125,12 @@ static bool retro_set_eject_state(bool ejected)
+@@ -841,6 +1158,12 @@ static bool retro_set_eject_state(bool ejected)
  
    eject_state = ejected;
  
@@ -4351,7 +4384,7 @@ index c53281053f..e2260dc848 100644
    Core::RunOnCPUThread(Core::System::GetInstance(), [ejected] {
      auto& system = Core::System::GetInstance();
      Core::CPUThreadGuard guard{system};
-@@ -853,6 +1143,8 @@ static bool retro_set_eject_state(bool ejected)
+@@ -853,6 +1176,8 @@ static bool retro_set_eject_state(bool ejected)
        system.GetDVDInterface().ChangeDisc(guard, path);
      }
    }, true); // wait_for_completion = true
@@ -4360,7 +4393,7 @@ index c53281053f..e2260dc848 100644
  
    return true;
  }
-@@ -864,6 +1156,11 @@ static bool retro_get_eject_state()
+@@ -864,6 +1189,11 @@ static bool retro_get_eject_state()
  
  static unsigned retro_get_image_index()
  {

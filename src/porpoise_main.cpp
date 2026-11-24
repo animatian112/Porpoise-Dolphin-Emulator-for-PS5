@@ -3131,6 +3131,27 @@ int main(int argc, char **argv)
                 unsetenv("PORPOISE_EXTRA_DISCS");
         }
         {
+            /* A Wii game's own SD card (its settings > SD Card): an image of
+             * the player's, in the Wii's SD slot for this start (Boot.cpp);
+             * without one, or when the file has gone, the usual card. */
+            std::string sd;
+            if (launch->platform == "Wii" && !launch->boot_menu && !g_play.wii_sd.empty())
+            {
+                struct stat st;
+                if (stat(g_play.wii_sd.c_str(), &st) == 0 && S_ISREG(st.st_mode))
+                    sd = g_play.wii_sd;
+                else
+                    ps5::debug::mark(("main: the game's SD card isn't there, the usual card: " + g_play.wii_sd).c_str());
+            }
+            if (!sd.empty())
+            {
+                setenv("PORPOISE_WII_SD_IMAGE", sd.c_str(), 1);
+                ps5::debug::mark(("main: the game's own SD card: " + sd).c_str());
+            }
+            else
+                unsetenv("PORPOISE_WII_SD_IMAGE");
+        }
+        {
             const std::string wads = g_app.take_wad_installs();
             if (!wads.empty())
             {

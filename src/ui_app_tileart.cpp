@@ -239,6 +239,7 @@ App::Action App::update_tile_art(double dt)
         const std::string folder = data_dir_ + "/home-art";
         mkdir(folder.c_str(), 0777);
         browse_images_ = true;
+        browse_sd_ = false;
         open_browser(folder);
         sfx(Sound::DetailsFlip);
         return Action::None;

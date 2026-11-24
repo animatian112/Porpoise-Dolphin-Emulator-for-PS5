@@ -53,6 +53,11 @@ struct Settings
     }
     std::string border;      /* "" none, or a border's name (built in, or a PNG in /data/porpoise/borders) */
     std::string online_dns;  /* Wii games online: the DNS server to ask ("" the console's own; global only) */
+    /* A Wii game's own SD card: an SD card image of the player's (a mod pack's
+     * sd.raw, say), in place of Porpoise's usual one. "" the usual card. Kept
+     * in a game's settings file only (never global); the core reads it from
+     * PORPOISE_WII_SD_IMAGE (Boot.cpp). */
+    std::string wii_sd;
     bool fps_overlay = false;
     int output_res = 0;           /* the picture sent to the TV: 0 the PS5's own, 1 1080p, 2 1440p, 3 4K (next start) */
     bool vsync = true;            /* frames on the TV's own vblank (porpoise_pacer); off: Porpoise's timer */

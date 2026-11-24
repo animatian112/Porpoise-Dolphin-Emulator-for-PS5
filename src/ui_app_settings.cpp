@@ -1504,6 +1504,32 @@ void App::build_game_settings()
         art.action = kRowCoversAgain;
         rows_.push_back(art);
     }
+    if (game_for_ && game_for_->platform == "Wii")
+    {
+        /* The Wii's SD card for this game: an image of the player's own (a
+         * mod pack's sd.raw), or Porpoise's usual one. */
+        SettingRow sd;
+        sd.section = "This Game";
+        sd.label = tr("SD Card");
+        sd.help = trf("The SD card this game sees in the Wii's SD slot. Choose an SD card image of your own, like a "
+                      "mod pack's sd.raw (put them in {folder} or on a USB drive), or keep Porpoise's usual card. The "
+                      "game can write to it, as to a real card.",
+                      {{"folder", sd_dir()}});
+        if (game_.wii_sd.empty())
+            sd.values = {tr("Usual Card")};
+        else
+        {
+            const std::string name = game_.wii_sd.substr(game_.wii_sd.find_last_of('/') + 1);
+            struct stat st;
+            const bool there = stat(game_.wii_sd.c_str(), &st) == 0 && S_ISREG(st.st_mode);
+            sd.values = {there ? name : trf("{name} (missing)", {{"name", name}})};
+            sd.help += " " + (there ? trf("Now: {path}.", {{"path", game_.wii_sd}})
+                                    : trf("{path} isn't there now, so the game gets the usual card.",
+                                          {{"path", game_.wii_sd}}));
+        }
+        sd.action = kRowWiiSd;
+        rows_.push_back(sd);
+    }
     /* The saved setups belong to This Game: before the Home Screen section,
      * or moving down stopped at that header and never reached them. */
     add_setup_rows(true);
@@ -2016,6 +2042,7 @@ void App::open_game_settings(Game &g)
 
 void App::close_game_settings()
 {
+    browse_sd_ = false;
     details_custom_ = !game_keys_.empty();
     game_for_ = nullptr;
     build_settings();
@@ -2281,6 +2308,7 @@ App::Action App::activate_row(const SettingRow &row)
         }
         return Action::None;
     case kRowAddFolder:
+        browse_sd_ = false; /* the game folder browser, not a game's SD cards */
 #ifdef PORPOISE_DESKTOP
         open_browser(""); /* the shortcuts: the games folder, Downloads, the drives */
         return Action::None;
@@ -2457,6 +2485,30 @@ App::Action App::activate_row(const SettingRow &row)
         return Action::None;
     case kRowTileArt:
         open_tile_art();
+        return Action::None;
+    case kRowWiiSd:
+        if (screen_ == Screen::GameSettings && game_for_)
+        {
+            /* From Porpoise's folder for them, or a drive (Triangle). */
+            mkdir(data_dir_.c_str(), 0777);
+            mkdir(sd_dir().c_str(), 0777);
+            browse_images_ = false;
+            browse_sd_ = true;
+            std::string start = sd_dir();
+            if (!game_.wii_sd.empty())
+            {
+                /* Where the one it has is, when that folder is still there. */
+                const std::string folder = game_.wii_sd.substr(0, game_.wii_sd.find_last_of('/'));
+                struct stat st;
+                if (!folder.empty() && stat(folder.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
+                    start = folder;
+            }
+            open_browser(start);
+            for (int i = 0; i < int(browse_entries_.size()); ++i)
+                if (browse_entries_[std::size_t(i)].path == game_.wii_sd)
+                    browse_row_ = i;
+            sfx(Sound::DetailsFlip);
+        }
         return Action::None;
     case kRowGcMenu:
         if (porpoise::bios::find_gamecube(data_dir_ + "/bios").empty())
@@ -3419,6 +3471,8 @@ std::vector<App::BrowseEntry> App::browse_places() const
     };
     if (browse_images_)
         add(tr("Porpoise's Tile Art Folder"), data_dir_ + "/home-art");
+    if (browse_sd_)
+        add(tr("Porpoise's SD Card Folder"), sd_dir());
 #ifdef PORPOISE_DESKTOP
     /* A computer: Porpoise's own games folder, the player's folders, and
      * every drive. */
@@ -3506,6 +3560,20 @@ void App::open_browser(std::string path)
                 b.kind = BrowseEntry::Folder;
                 folders.push_back(b);
             }
+            else if (browse_sd_)
+            {
+                /* SD card images: Dolphin's sd.raw, and the .img name some
+                 * mod packs use. */
+                std::string ext = name.substr(name.find_last_of('.') == std::string::npos ? name.size()
+                                                                                         : name.find_last_of('.'));
+                ext = lower_copy(ext);
+                if (ext == ".raw" || ext == ".img")
+                {
+                    b.kind = BrowseEntry::SdImage;
+                    b.size = stat_ok ? (long long)st.st_size : 0;
+                    games.push_back(b);
+                }
+            }
             else if (browse_images_)
             {
                 std::string ext = name.substr(name.find_last_of('.') == std::string::npos ? name.size()
@@ -3534,7 +3602,7 @@ void App::open_browser(std::string path)
     std::sort(games.begin(), games.end(), by_name);
     /* How many games each folder holds right inside it (not on "/", where
      * the folders are the system's own). */
-    if (path != "/" && !browse_images_)
+    if (path != "/" && !browse_images_ && !browse_sd_)
         for (BrowseEntry &f : folders)
             f.games = count_games(f.path, 0);
     browse_games_ = int(games.size());
@@ -3560,6 +3628,47 @@ void App::start_game_copy(const std::string &from)
         g_copy.joinable = true;
     else
         copy_worker(nullptr);
+}
+
+std::string App::sd_dir() const
+{
+    return data_dir_ + "/sd";
+}
+
+/* A Wii game's SD card: kept in its own settings file at once (a file
+ * chosen in the browser isn't left waiting for Apply), with whatever else
+ * it already had saved; its other changes still wait for Apply. */
+void App::set_game_sd(const std::string &path)
+{
+    if (!game_for_)
+        return;
+    auto drop = [](std::vector<std::string> &keys) {
+        keys.erase(std::remove(keys.begin(), keys.end(), std::string("wii_sd")), keys.end());
+    };
+    game_.wii_sd = path;
+    drop(game_keys_);
+    Settings saved = game_base_;
+    saved.wii_sd = path;
+    std::vector<std::string> saved_keys = game_keys_base_;
+    drop(saved_keys);
+    if (!path.empty())
+    {
+        game_keys_.push_back("wii_sd");
+        saved_keys.push_back("wii_sd");
+    }
+    mkdir((data_dir_ + "/game-settings").c_str(), 0777);
+    saved.save_keys(game_settings_path(*game_for_), saved_keys);
+    game_base_ = saved;
+    game_keys_base_ = saved_keys;
+}
+
+void App::close_sd_browser()
+{
+    browse_sd_ = false;
+    const int row = settings_row_;
+    open_screen(Screen::GameSettings);
+    build_game_settings();
+    settings_row_ = std::clamp(row, 0, std::max(0, int(rows_.size()) - 1));
 }
 
 App::Action App::update_browser(bool up, bool down)
@@ -3620,6 +3729,14 @@ App::Action App::update_browser(bool up, bool down)
             sfx(Sound::LaunchGame);
             return Action::None;
         }
+        if (e.kind == BrowseEntry::SdImage)
+        {
+            /* The game's SD card: this one. */
+            set_game_sd(e.path);
+            close_sd_browser();
+            sfx(Sound::LaunchGame);
+            return Action::None;
+        }
         if (e.kind != BrowseEntry::Game)
         {
             open_browser(e.path);
@@ -3647,6 +3764,17 @@ App::Action App::update_browser(bool up, bool down)
         open_browser(browse_path_.empty() ? "/" : "");
         return Action::None;
     }
+    if (pressed(BtnSquare) && browse_sd_)
+    {
+        /* Back to Porpoise's usual card. */
+        if (game_for_ && !game_.wii_sd.empty())
+        {
+            set_game_sd("");
+            close_sd_browser();
+            sfx(Sound::LaunchGame);
+        }
+        return Action::None;
+    }
     if (pressed(BtnSquare) && !browse_images_ && !browse_path_.empty() && browse_path_ != "/")
     {
         std::string folder = browse_path_;
@@ -3672,6 +3800,12 @@ App::Action App::update_browser(bool up, bool down)
         {
             browse_images_ = false;
             open_screen(Screen::TileArt);
+            return Action::None;
+        }
+        if (browse_sd_ && (browse_path_.empty() || browse_path_ == "/" || browse_path_ == sd_dir()))
+        {
+            close_sd_browser();
+            sfx(Sound::MovingTab);
             return Action::None;
         }
         if (browse_path_.empty() || browse_path_ == "/")
@@ -3704,13 +3838,15 @@ void App::draw_browser()
     const float x = 190, y = 136, w = 1540, h = 800;
     g.panel(x, y, w, h, rgba(0x0F1F63, 0.66f), 0.75f, kR, rgba(0x4C6FD8, 0.9f), 1.8f, 0, 0.12f);
     g.text_mid(Font::Bold, ts(44), x + 50, y + 62, kWhite, Align::Left,
-               tr(browse_images_ ? "Choose a Picture" : "Choose a Game Folder"));
+               tr(browse_sd_ ? "Choose an SD Card" : browse_images_ ? "Choose a Picture" : "Choose a Game Folder"));
     const std::string where = browse_path_.empty() ? tr("Drives and Shortcuts") : browse_path_;
     g.text_mid(Font::SemiBold, ts(26), x + 50, y + 110, kIcy, Align::Left, fit(g, Font::SemiBold, ts(26), where, w - 520));
     if (!browse_path_.empty() && browse_path_ != "/")
     {
         const std::string count =
-            browse_images_ ? (browse_games_ == 0 ? tr("No pictures right here")
+            browse_sd_ ? (browse_games_ == 0 ? tr("No SD cards right here")
+                                             : plural(browse_games_, "1 SD card right here", "{n} SD cards right here"))
+            : browse_images_ ? (browse_games_ == 0 ? tr("No pictures right here")
                                                  : plural(browse_games_, "1 picture right here",
                                                           "{n} pictures right here"))
             : browse_games_ == 0 ? tr("No games right here")
@@ -3737,16 +3873,32 @@ void App::draw_browser()
                            tr("Put .png or .jpg pictures here (over FTP, for example), or press Triangle for a "
                               "USB drive."),
                            w - 160));
+        if (browse_sd_ && !browse_unreadable_)
+            g.text_mid(Font::Regular, ts(24), x + w * 0.5f, y + 440, kLavender, Align::Center,
+                       fit(g, Font::Regular, ts(24),
+                           tr("Put SD card images (.raw) here (over FTP, for example), or press Triangle for a "
+                              "USB drive."),
+                           w - 160));
     }
     for (int i = browse_first_; i < n && i < browse_first_ + kVisible; ++i)
     {
         const BrowseEntry &e = browse_entries_[std::size_t(i)];
         const bool on = i == browse_row_;
-        const bool game = e.kind == BrowseEntry::Game || e.kind == BrowseEntry::Picture;
+        const bool game =
+            e.kind == BrowseEntry::Game || e.kind == BrowseEntry::Picture || e.kind == BrowseEntry::SdImage;
         const float cy = ry + row_h * 0.5f;
         if (on)
             g.panel(rx, ry + 4, rw, row_h - 8, rgba(game ? 0x0E5A8A : 0x1D45B8, 0.88f), 0.7f, kR, kIcy, 2.4f, 10, 0.18f);
-        if (e.kind == BrowseEntry::Picture)
+        if (e.kind == BrowseEntry::SdImage)
+        {
+            /* A little SD card: its body, the clipped corner, the contacts. */
+            const Color sc = on ? kWhite : kCyan;
+            g.panel(rx + 36, cy - 18, 28, 36, with_alpha(sc, 0.9f), 1, 4);
+            g.panel(rx + 54, cy - 20, 12, 10, on ? rgba(0x0E5A8A) : rgba(0x0F1F63), 1, 0);
+            for (int c = 0; c < 3; ++c)
+                g.panel(rx + 40 + float(c) * 7, cy - 13, 4, 8, rgba(0x0F1F63), 1, 1);
+        }
+        else if (e.kind == BrowseEntry::Picture)
         {
             /* A little picture: a frame and a hill. */
             const Color pc = on ? kWhite : kCyan;
@@ -3809,6 +3961,15 @@ void App::draw_browser()
     }
 
     std::vector<std::pair<Glyph, std::string>> right;
+    if (browse_sd_)
+    {
+        const bool on_card = browse_row_ < n && browse_entries_[std::size_t(browse_row_)].kind == BrowseEntry::SdImage;
+        if (game_for_ && !game_.wii_sd.empty())
+            right.push_back({Glyph::Square, "Use the Usual Card"});
+        right.push_back({Glyph::Triangle, browse_path_.empty() ? "Whole System" : "Drives"});
+        draw_prompts({{Glyph::Cross, on_card ? "Use This SD Card" : "Open"}, {Glyph::Circle, "Back"}}, right, "");
+        return;
+    }
     if (browse_images_)
     {
         const bool on_picture =
