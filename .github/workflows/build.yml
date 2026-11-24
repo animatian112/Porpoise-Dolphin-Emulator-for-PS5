@@ -57,6 +57,10 @@ jobs:
           git clone https://github.com/mihawk-99/PS5_Mesa PS5_Mesa
           git -C PS5_PayloadSDK fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*'
           git -C PS5_Mesa fetch --quiet origin '+refs/heads/*:refs/remotes/origin/*'
+          # Porpoise's pinned SDK revision isn't on a branch of the fork: by name.
+          sdk_rev=$(sed -n 's/^sdk_revision=//p' Porpoise/tools/setup-native-dependencies.sh)
+          git -C PS5_PayloadSDK fetch --quiet origin "$sdk_rev"
+          git -C PS5_PayloadSDK cat-file -e "$sdk_rev^{commit}"
 
       - name: Restore built dependencies
         uses: actions/cache@v4
