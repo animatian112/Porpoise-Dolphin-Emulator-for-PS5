@@ -4152,7 +4152,7 @@ index c53281053f..e2260dc848 100644
    for (auto& normalized_game_path : normalized_game_paths)
      Libretro::disk_paths.push_back(Libretro::VFile::DenormalizePath(normalized_game_path));
  
-@@ -708,16 +854,158 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -708,16 +854,172 @@ bool retro_load_game(const struct retro_game_info* game)
    const bool disc_based_games_boot_to_wii_menu = Libretro::GetOption<bool>(Libretro::Options::core::DISC_BASED_GAMES_BOOT_TO_WII_MENU, false);
    std::unique_ptr<BootParameters> boot_params = BootParameters::GenerateFromFile(normalized_game_paths);
  
@@ -4169,6 +4169,20 @@ index c53281053f..e2260dc848 100644
 +   * is saved in Dolphin.ini at the end, and a WAD or an app started later
 +   * would otherwise find the last menu's disc in its drive). */
 +  Config::SetCurrent(Config::MAIN_DEFAULT_ISO, "");
++  /* Porpoise: a disc in the drive for a Homebrew Channel app (its settings >
++   * Disc in the Drive), as a real Wii has one in it when the app starts: a
++   * mod's launcher (Brawl's NetPlay launchers, say) loads its codes from the
++   * SD card and then boots that disc. Dolphin puts MAIN_DEFAULT_ISO in the
++   * drive for an app (or a NAND title); a menu below sets its own. */
++  {
++    const std::string app_disc = env("PORPOISE_APP_DISC");
++    if (!app_disc.empty())
++    {
++      const std::string app_disc_path = Libretro::VFile::NormalizePath(app_disc);
++      Config::SetCurrent(Config::MAIN_DEFAULT_ISO, app_disc_path);
++      NOTICE_LOG_FMT(BOOT, "Porpoise: the app's disc in the drive: {}", app_disc_path);
++    }
++  }
 +  const std::string porpoise_menu = env("PORPOISE_BOOT_MENU");
 +  const bool porpoise_menu_disc = env("PORPOISE_BOOT_DISC") == "1";
 +  /* Porpoise: whether a menu really boots (a disc the Wii Menu won't take
@@ -4315,7 +4329,7 @@ index c53281053f..e2260dc848 100644
      }
  
      const std::string wii_menu_tmd_file_name = Common::GetTMDFileName(Titles::SYSTEM_MENU, Common::FromWhichRoot::Configured);
-@@ -727,17 +1015,45 @@ bool retro_load_game(const struct retro_game_info* game)
+@@ -727,17 +1029,45 @@ bool retro_load_game(const struct retro_game_info* game)
  
      if (is_disc_title && wii_menu_installed)
      {
@@ -4363,7 +4377,7 @@ index c53281053f..e2260dc848 100644
    Libretro::Input::InitStage2();
  
    const bool importCheats = Libretro::GetOption<bool>(retroarch_core::CHEATS_IMPORT, true);
-@@ -804,6 +1120,7 @@ void retro_unload_game(void)
+@@ -804,6 +1134,7 @@ void retro_unload_game(void)
  
      Core::Shutdown(system);
    }
@@ -4371,7 +4385,7 @@ index c53281053f..e2260dc848 100644
  
    if (!g_context_status.IsDestroyed() && g_video_backend)
      g_video_backend->Shutdown();
-@@ -841,6 +1158,12 @@ static bool retro_set_eject_state(bool ejected)
+@@ -841,6 +1172,12 @@ static bool retro_set_eject_state(bool ejected)
  
    eject_state = ejected;
  
@@ -4384,7 +4398,7 @@ index c53281053f..e2260dc848 100644
    Core::RunOnCPUThread(Core::System::GetInstance(), [ejected] {
      auto& system = Core::System::GetInstance();
      Core::CPUThreadGuard guard{system};
-@@ -853,6 +1176,8 @@ static bool retro_set_eject_state(bool ejected)
+@@ -853,6 +1190,8 @@ static bool retro_set_eject_state(bool ejected)
        system.GetDVDInterface().ChangeDisc(guard, path);
      }
    }, true); // wait_for_completion = true
@@ -4393,7 +4407,7 @@ index c53281053f..e2260dc848 100644
  
    return true;
  }
-@@ -864,6 +1189,11 @@ static bool retro_get_eject_state()
+@@ -864,6 +1203,11 @@ static bool retro_get_eject_state()
  
  static unsigned retro_get_image_index()
  {

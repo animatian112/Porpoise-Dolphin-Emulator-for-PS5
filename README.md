@@ -538,6 +538,11 @@ Wii's SD slot and can write to it as to a real card, so keep a copy of the
 original. **Square** in the picker puts the game back on Porpoise's usual card.
 A game with no card of its own, and every GameCube game, keeps the usual one.
 
+Mods that start from a launcher app (Brawl's NetPlay launchers, for example)
+also need the game in the drive: put the launcher in a folder of its own with a
+`meta.xml` (so it's listed as an app), then in the app's settings set **This
+Game → SD Card** to the mod's sd.raw and **Disc in the Drive** to your Brawl.
+
 ## Controls
 
 ### Launcher

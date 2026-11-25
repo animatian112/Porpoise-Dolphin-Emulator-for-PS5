@@ -1530,6 +1530,42 @@ void App::build_game_settings()
         sd.action = kRowWiiSd;
         rows_.push_back(sd);
     }
+    if (game_for_ && game_for_->kind == "Homebrew")
+    {
+        /* A Homebrew Channel app's disc in the drive: a mod's launcher boots
+         * the disc a real Wii would have in it (Brawl, for its NetPlay
+         * launchers). The choices: no disc, or one of the library's Wii discs. */
+        SettingRow d;
+        d.section = "This Game";
+        d.key = "app_disc";
+        d.label = tr("Disc in the Drive");
+        d.help = tr("The disc in the Wii's drive when this app starts, as on a real Wii. A mod's launcher (Brawl's "
+                    "NetPlay launchers, for example) loads its codes from the SD card, then boots this disc: pick "
+                    "your copy of the game here and its sd.raw under SD Card.");
+        disc_paths_ = {""};
+        d.values = {tr("No Disc")};
+        disc_choice_ = 0;
+        for (const Game &g : lib_->games())
+        {
+            if (g.platform != "Wii" || g.kind == "Homebrew" || g.format == "WAD")
+                continue;
+            if (g.path == game_.app_disc)
+                disc_choice_ = int(disc_paths_.size());
+            disc_paths_.push_back(g.path);
+            d.values.push_back(g.id.empty() ? g.title : g.title + " (" + g.id + ")");
+        }
+        if (!game_.app_disc.empty() && disc_choice_ == 0)
+        {
+            /* Chosen before, but not in the library now. */
+            disc_choice_ = int(disc_paths_.size());
+            disc_paths_.push_back(game_.app_disc);
+            d.values.push_back(trf("{name} (missing)",
+                                   {{"name", game_.app_disc.substr(game_.app_disc.find_last_of('/') + 1)}}));
+        }
+        d.int_value = &disc_choice_;
+        d.text_value = &game_.app_disc;
+        rows_.push_back(d);
+    }
     /* The saved setups belong to This Game: before the Home Screen section,
      * or moving down stopped at that header and never reached them. */
     add_setup_rows(true);
@@ -2073,6 +2109,8 @@ void App::change_setting(int dir)
             *r.int_value = std::clamp(*r.int_value + dir, r.min, r.min + n - 1);
         if (r.text_value && r.int_value == &border_choice_)
             *r.text_value = border_names_[std::size_t(std::clamp(border_choice_, 0, int(border_names_.size()) - 1))];
+        if (r.text_value && r.int_value == &disc_choice_)
+            *r.text_value = disc_paths_[std::size_t(std::clamp(disc_choice_, 0, int(disc_paths_.size()) - 1))];
     }
     if (r.key == "enh_advanced")
     {

@@ -58,6 +58,10 @@ struct Settings
      * in a game's settings file only (never global); the core reads it from
      * PORPOISE_WII_SD_IMAGE (Boot.cpp). */
     std::string wii_sd;
+    /* A Homebrew Channel app's disc in the drive (a mod launcher's Brawl,
+     * say): a disc's path, "" none. A game's settings file only; the core
+     * reads it from PORPOISE_APP_DISC (Boot.cpp). */
+    std::string app_disc;
     bool fps_overlay = false;
     int output_res = 0;           /* the picture sent to the TV: 0 the PS5's own, 1 1080p, 2 1440p, 3 4K (next start) */
     bool vsync = true;            /* frames on the TV's own vblank (porpoise_pacer); off: Porpoise's timer */

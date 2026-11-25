@@ -3150,6 +3150,15 @@ int main(int argc, char **argv)
             }
             else
                 unsetenv("PORPOISE_WII_SD_IMAGE");
+            /* A Homebrew Channel app's disc in the drive (its settings >
+             * Disc in the Drive): a mod launcher boots it (Boot.cpp). */
+            if (launch->kind == "Homebrew" && !launch->boot_menu && !g_play.app_disc.empty())
+            {
+                setenv("PORPOISE_APP_DISC", g_play.app_disc.c_str(), 1);
+                ps5::debug::mark(("main: the app's disc in the drive: " + g_play.app_disc).c_str());
+            }
+            else
+                unsetenv("PORPOISE_APP_DISC");
         }
         {
             const std::string wads = g_app.take_wad_installs();

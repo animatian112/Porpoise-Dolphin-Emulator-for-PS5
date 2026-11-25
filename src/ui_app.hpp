@@ -1431,6 +1431,8 @@ private:
     bool qr_tried_ = false;
     std::vector<std::string> border_names_; /* the Border row's choices */
     int border_choice_ = 0;
+    std::vector<std::string> disc_paths_; /* an app's Disc in the Drive row's choices ("" no disc) */
+    int disc_choice_ = 0;
     /* A game's home screen tile (Game settings > Home screen): its icon (0 the
      * cover, 1 the player's own), background (0 Porpoise's, 1 the cover, 2 the
      * player's own), and whether Porpoise closes after the game. */
